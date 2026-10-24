@@ -1,6 +1,5 @@
 # ToggleMaster — Self-Healing (Tech Challenge Fase 4)
-
-Parte de **Heloísa**: receptor de webhook com RBAC, filtro e cooldown; falha controlada
+ receptor de webhook com RBAC, filtro e cooldown; falha controlada
 (chaos) no `auth-service`; roteiro/ensaios da "prova real"; logs da automação como evidência.
 
 Este diretório espelha a estrutura do repo principal
