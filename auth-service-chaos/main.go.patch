@@ -1,0 +1,22 @@
+--- a/auth-service/main.go	2026-10-24 13:54:51.846437188 +0000
++++ b/auth-service/main.go	2026-10-24 13:54:51.908587853 +0000
+@@ -71,12 +71,18 @@
+ 		app.masterKeyAuthMiddleware(http.HandlerFunc(app.createKeyHandler)),
+ 	)
+ 
++	// Falha controlada p/ validar o self-healing (só ativa com CHAOS_ENABLED=true).
++	mux.Handle(
++		"/admin/chaos",
++		app.masterKeyAuthMiddleware(http.HandlerFunc(chaosAdminHandler)),
++	)
++
+ 	writeLog("info", "service_started", LogEvent{
+ 		Component: "http-server",
+ 		Message:   "auth-service started",
+ 	})
+ 
+-	if err := http.ListenAndServe(":"+port, mux); err != nil {
++	if err := http.ListenAndServe(":"+port, chaosMiddleware(mux)); err != nil {
+ 		fatalLog("http_server_failed", LogEvent{
+ 			Component: "http-server",
+ 			Message:   "HTTP server stopped unexpectedly",

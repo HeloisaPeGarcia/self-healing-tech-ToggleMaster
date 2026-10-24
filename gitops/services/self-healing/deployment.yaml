@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healing
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/name: self-healing
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  # 1 réplica de propósito: o cooldown fica em memória.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: self-healing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: self-healing
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      serviceAccountName: self-healing
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: self-healing
+        # A tag é reescrita pelo workflow (sed) a cada deploy, como nos outros serviços.
+        image: 966523587984.dkr.ecr.us-east-1.amazonaws.com/togglemaster-self-healing:bootstrap
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8090
+        env:
+        - name: PORT
+          value: "8090"
+        - name: CONFIG_PATH
+          value: /etc/self-healing/config.json
+        - name: DRY_RUN
+          value: "false"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: togglemaster-self-healing
+              key: WEBHOOK_TOKEN
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/self-healing
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: self-healing-config

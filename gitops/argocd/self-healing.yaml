@@ -1,0 +1,24 @@
+# Copie este bloco para o final de gitops/argocd/applications.yaml (o bootstrap
+# aplica esse arquivo), ou aplique direto: kubectl apply -f self-healing.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: togglemaster-self-healing
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Gabrielpalhanogomes2803/tech-challenge-feature-flags.git
+    targetRevision: main
+    path: gitops/services/self-healing
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: togglemaster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

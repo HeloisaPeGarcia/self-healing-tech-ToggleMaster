@@ -1,0 +1,31 @@
+{
+  "receiver": "self-healing",
+  "status": "firing",
+  "orgId": 1,
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "DiskPressureNode",
+        "grafana_folder": "ToggleMaster",
+        "service": "auth-service",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "Taxa de erros 5xx do auth-service acima de 5%"
+      },
+      "startsAt": "2026-10-24T15:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "",
+      "fingerprint": "demo0000other001"
+    }
+  ],
+  "groupLabels": { "alertname": "DiskPressureNode" },
+  "commonLabels": { "alertname": "DiskPressureNode", "service": "auth-service" },
+  "commonAnnotations": {},
+  "externalURL": "http://togglemaster-grafana.monitoring.svc.cluster.local",
+  "version": "1",
+  "title": "[FIRING:1] DiskPressureNode",
+  "state": "alerting",
+  "message": "**Firing** DiskPressureNode (exemplo para ensaio)"
+}

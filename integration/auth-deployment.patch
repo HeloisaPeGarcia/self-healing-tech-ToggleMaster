@@ -1,0 +1,13 @@
+--- a/gitops/services/auth/deployment.yaml	2026-10-24 13:55:26.220891086 +0000
++++ b/gitops/services/auth/deployment.yaml	2026-10-24 13:55:26.229889673 +0000
+@@ -53,6 +53,10 @@
+             secretKeyRef:
+               name: togglemaster-runtime-secrets
+               key: MASTER_KEY
++        # Habilita /admin/chaos (falha controlada para validar o self-healing).
++        # Remover (ou "false") após a demonstração.
++        - name: CHAOS_ENABLED
++          value: "true"
+         readinessProbe:
+           httpGet:
+             path: /health

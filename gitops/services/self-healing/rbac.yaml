@@ -1,0 +1,36 @@
+# Privilégio mínimo: só pode LER e ATUALIZAR (patch) os Deployments listados em
+# resourceNames, e somente no namespace togglemaster. Nada de ClusterRole,
+# nada de delete/create, nada de pods/secrets.
+#
+# IMPORTANTE: ao adicionar uma regra nova em config.json, inclua o Deployment
+# aqui também; caso contrário o patch recebe 403 (e isso é proposital).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: self-healing-restarter
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/name: self-healing
+    app.kubernetes.io/part-of: togglemaster
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  resourceNames: ["auth-service"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: self-healing-restarter
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/name: self-healing
+    app.kubernetes.io/part-of: togglemaster
+subjects:
+- kind: ServiceAccount
+  name: self-healing
+  namespace: togglemaster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: self-healing-restarter

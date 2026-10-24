@@ -1,0 +1,12 @@
+--- a/terraform/main.tf	2026-10-24 13:55:35.195131077 +0000
++++ b/terraform/main.tf	2026-10-24 13:55:35.211589178 +0000
+@@ -18,7 +18,8 @@
+     "togglemaster-flag",
+     "togglemaster-targeting",
+     "togglemaster-evaluation",
+-    "togglemaster-analytics"
++    "togglemaster-analytics",
++    "togglemaster-self-healing"
+   ]
+ 
+   tags = local.common_tags

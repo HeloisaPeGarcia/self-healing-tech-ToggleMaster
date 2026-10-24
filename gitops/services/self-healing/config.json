@@ -1,0 +1,15 @@
+{
+  "namespace": "togglemaster",
+  "cooldownSeconds": 300,
+  "rules": [
+    {
+      "alertname": "AuthHigh5xxRate",
+      "deployment": "auth-service"
+    },
+    {
+      "alertname": "ToggleMasterHTTPHealthDown",
+      "match": { "service": "auth-service" },
+      "deployment": "auth-service"
+    }
+  ]
+}

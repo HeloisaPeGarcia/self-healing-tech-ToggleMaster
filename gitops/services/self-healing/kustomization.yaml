@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- serviceaccount.yaml
+- rbac.yaml
+- deployment.yaml
+- service.yaml
+# A allowlist de alertas vive no Git. Mudou o arquivo -> o nome do ConfigMap muda
+# (hash) -> o pod é recriado com a regra nova.
+configMapGenerator:
+- name: self-healing-config
+  files:
+  - config.json

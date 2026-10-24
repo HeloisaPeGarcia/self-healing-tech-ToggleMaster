@@ -1,0 +1,21 @@
+--- a/.github/workflows/main.yml	2026-10-24 13:55:35.197124694 +0000
++++ b/.github/workflows/main.yml	2026-10-24 13:55:35.211649874 +0000
+@@ -76,6 +76,7 @@
+           targeting-service|togglemaster-targeting
+           evaluation-service|togglemaster-evaluation
+           analytics-service|togglemaster-analytics
++          self-healing|togglemaster-self-healing
+           SERVICES
+ 
+       - name: Update GitOps image tags
+@@ -106,6 +107,10 @@
+             "s|image: .*togglemaster-analytics:.*|image: ${REGISTRY}/togglemaster-analytics:${IMAGE_TAG}|" \
+             gitops/services/analytics/deployment.yaml
+ 
++          sed -i \
++            "s|image: .*togglemaster-self-healing:.*|image: ${REGISTRY}/togglemaster-self-healing:${IMAGE_TAG}|" \
++            gitops/services/self-healing/deployment.yaml
++
+       - name: Commit GitOps update
+         shell: bash
+         run: |
