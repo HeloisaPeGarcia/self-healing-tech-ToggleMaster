@@ -1,0 +1,112 @@
+name: Self-Healing Tests
+
+on:
+  pull_request:
+    paths:
+      - "self-healing/**"
+      - "gitops/services/self-healing/**"
+      - "auth-service/**"
+      - "samples/**"
+      - "scripts/e2e-kind.sh"
+      - ".github/workflows/self-healing-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "self-healing/**"
+      - "gitops/services/self-healing/**"
+      - "scripts/e2e-kind.sh"
+      - ".github/workflows/self-healing-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-healing-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Testes unitários (receptor + chaos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false
+
+      - name: Receptor - formatação, vet e testes
+        working-directory: self-healing
+        run: |
+          test -z "$(gofmt -l .)" || { echo "gofmt pendente:"; gofmt -l .; exit 1; }
+          go vet ./...
+          go test -race -count=1 ./...
+
+      # No repo principal o chaos.go já está dentro de auth-service/.
+      - name: Chaos do auth-service
+        if: ${{ hashFiles('auth-service/go.mod') != '' && hashFiles('auth-service/chaos.go') != '' }}
+        working-directory: auth-service
+        run: |
+          go vet ./...
+          go test -run Chaos -count=1 ./...
+
+  manifests:
+    name: Manifests (schema + política de RBAC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Renderizar kustomize e validar schema
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz kubeconform
+          kubectl kustomize gitops/services/self-healing > /tmp/self-healing.yaml
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 /tmp/self-healing.yaml
+
+      - name: Política - privilégio mínimo
+        run: |
+          if grep -q 'kind: ClusterRole' /tmp/self-healing.yaml; then
+            echo "::error::ClusterRole/ClusterRoleBinding não é permitido para o self-healing"; exit 1
+          fi
+          if ! grep -q 'resourceNames:' /tmp/self-healing.yaml; then
+            echo "::error::o Role precisa restringir por resourceNames"; exit 1
+          fi
+          if grep -nE "^[[:space:]]*- ['\"]?(delete|create|update|deletecollection|\*)['\"]?[[:space:]]*$" /tmp/self-healing.yaml; then
+            echo "::error::verbo proibido no Role (apenas get/patch)"; exit 1
+          fi
+          if grep -q 'replicas: 1' /tmp/self-healing.yaml; then :; else
+            echo "::error::self-healing precisa de replicas: 1 (cooldown em memória)"; exit 1
+          fi
+          echo "Política OK"
+
+  e2e-kind:
+    name: E2E em kind (RBAC real + restart)
+    needs: [unit, manifests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build da imagem do receptor
+        run: docker build -t self-healing:ci ./self-healing
+
+      - name: Criar cluster kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: sh-e2e
+
+      - name: Carregar imagem no kind
+        run: kind load docker-image self-healing:ci --name sh-e2e
+
+      - name: Rodar o teste E2E
+        run: scripts/e2e-kind.sh
+
+      - name: Anexar log do receptor como evidência
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-healing-e2e-log
+          path: e2e-self-healing.log
+          if-no-files-found: ignore
