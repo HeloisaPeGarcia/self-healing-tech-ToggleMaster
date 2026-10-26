@@ -1,0 +1,101 @@
+name: Self-Healing Config
+
+# Preenche a allowlist do self-healing na hora, a partir dos dados que o time
+# combinou (alertname da Susana, deployment, cooldown), e abre um PR.
+# Atualiza config.json E o resourceNames do RBAC juntos, para não ficarem fora de sincronia.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rules:
+        description: "Regras, UMA POR LINHA: alertname|deployment|label=valor,label2=valor (labels opcionais)"
+        required: true
+        type: string
+        default: |
+          AuthHigh5xxRate|auth-service|service=auth-service
+          ToggleMasterHTTPHealthDown|auth-service|service=auth-service
+      cooldown_seconds:
+        description: "Cooldown entre restarts do mesmo deployment (30 a 3600)"
+        required: true
+        default: "300"
+        type: string
+      dry_run:
+        description: "Só mostrar o resultado no log, sem abrir PR"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: self-healing-config
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Gerar config e abrir PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false
+
+      # Os inputs entram por variável de ambiente (nunca interpolados no shell),
+      # e o script valida tudo por regex antes de escrever qualquer arquivo.
+      - name: Gerar config.json e rbac.yaml
+        env:
+          RULES: ${{ inputs.rules }}
+          COOLDOWN: ${{ inputs.cooldown_seconds }}
+        run: python3 -I scripts/render_config.py --rules "$RULES" --cooldown "$COOLDOWN"
+
+      - name: Validar com o próprio receptor
+        run: |
+          cd self-healing
+          go test -count=1 ./...
+          go build -o /tmp/self-healing .
+          PORT=18090 WEBHOOK_TOKEN=ci DRY_RUN=true \
+            CONFIG_PATH="$GITHUB_WORKSPACE/gitops/services/self-healing/config.json" \
+            /tmp/self-healing > /tmp/receiver.log 2>&1 &
+          PID=$!
+          sleep 2
+          kill "$PID" 2>/dev/null || true
+          grep -q '"event":"service_started"' /tmp/receiver.log \
+            || { echo "::error::o receptor não aceitou o config gerado"; cat /tmp/receiver.log; exit 1; }
+
+      - name: Resumo
+        run: |
+          {
+            echo '### Configuração gerada'
+            echo '```json'; cat gitops/services/self-healing/config.json; echo '```'
+            echo '**RBAC (`resourceNames`):**'
+            echo '```'; grep 'resourceNames' gitops/services/self-healing/rbac.yaml | grep -v '^#'; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git --no-pager diff --stat
+
+      - name: Abrir PR
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Nada mudou: a configuração já está igual."; exit 0
+          fi
+          BRANCH="chore/self-healing-config-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add gitops/services/self-healing/config.json gitops/services/self-healing/rbac.yaml
+          git commit -m "chore(self-healing): atualiza allowlist e RBAC"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base "${GITHUB_REF_NAME}" --head "$BRANCH" \
+            --title "chore(self-healing): atualiza allowlist e RBAC" \
+            --body "Gerado por **Self-Healing Config** (run ${GITHUB_RUN_ID}) por @${GITHUB_ACTOR}.
+
+          Altera \`config.json\` (quais alertas reiniciam qual Deployment) e \`rbac.yaml\` (\`resourceNames\`). **Revise os deployments permitidos**: eles definem o que o receptor pode reiniciar."
