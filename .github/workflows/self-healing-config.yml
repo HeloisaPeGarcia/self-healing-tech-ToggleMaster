@@ -38,7 +38,11 @@ jobs:
     name: Gerar config e abrir PR
     runs-on: ubuntu-latest
     steps:
+      # Com o secret PR_TOKEN (PAT ou GitHub App token), o PR e o push passam a
+      # disparar CI/self-healing-test. Sem ele, cai no GITHUB_TOKEN (PR sem checks).
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PR_TOKEN || github.token }}
 
       - uses: actions/setup-go@v5
         with:
@@ -80,9 +84,13 @@ jobs:
       - name: Abrir PR
         if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PR_TOKEN || github.token }}
+          HAS_PR_TOKEN: ${{ secrets.PR_TOKEN != '' }}
         run: |
           set -euo pipefail
+          if [ "$HAS_PR_TOKEN" != "true" ]; then
+            echo "::warning::secret PR_TOKEN ausente: o PR será aberto com GITHUB_TOKEN e NÃO disparará CI/self-healing-test. Feche e reabra o PR para rodar os checks."
+          fi
           if git diff --quiet; then
             echo "Nada mudou: a configuração já está igual."; exit 0
           fi
