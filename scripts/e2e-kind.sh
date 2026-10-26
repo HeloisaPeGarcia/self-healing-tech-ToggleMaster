@@ -27,10 +27,28 @@ LOG_OUT="${LOG_OUT:-$ROOT/e2e-self-healing.log}"
 PF_PID=""
 
 dump() {
-  echo "::group::diagnóstico"
+  echo "::group::diagnóstico: pods e deployments"
   kubectl -n "$NS" get pods,deploy -o wide || true
+  echo "::endgroup::"
+
+  echo "::group::diagnóstico: estado do container (motivo de não ficar pronto)"
+  kubectl -n "$NS" get pods -l app.kubernetes.io/name=self-healing \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" imagem="}{.spec.containers[0].image}{" waiting="}{.status.containerStatuses[0].state.waiting.reason}{" | "}{.status.containerStatuses[0].state.waiting.message}{" terminated="}{.status.containerStatuses[0].lastState.terminated.reason}{" exit="}{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}{end}' || true
+  echo "::endgroup::"
+
+  echo "::group::diagnóstico: eventos do pod (ImagePull, probes, OOM...)"
+  kubectl -n "$NS" describe pod -l app.kubernetes.io/name=self-healing | sed -n '/^Events:/,$p' || true
+  kubectl -n "$NS" get events --sort-by=.lastTimestamp | tail -30 || true
+  echo "::endgroup::"
+
+  echo "::group::diagnóstico: logs do receptor (atual e anterior)"
   kubectl -n "$NS" logs deploy/self-healing --tail=200 || true
-  kubectl -n "$NS" describe deploy/self-healing | tail -30 || true
+  echo "--- logs da execução anterior (se houve crash) ---"
+  kubectl -n "$NS" logs deploy/self-healing --previous --tail=200 2>&1 || true
+  echo "::endgroup::"
+
+  echo "::group::diagnóstico: imagens no nó do kind"
+  docker exec "$(kind get clusters | head -n1)-control-plane" crictl images 2>/dev/null | grep -E 'self-healing|IMAGE' || echo "(não consegui listar imagens do nó)"
   echo "::endgroup::"
 }
 fail() { echo "::error::FALHOU: $*"; dump; exit 1; }
