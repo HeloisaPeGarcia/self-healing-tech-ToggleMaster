@@ -113,5 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: self-healing-e2e-log
-          path: e2e-self-healing.log
+          path: |
+            e2e-self-healing.log
+            e2e-diagnostico.txt
           if-no-files-found: ignore

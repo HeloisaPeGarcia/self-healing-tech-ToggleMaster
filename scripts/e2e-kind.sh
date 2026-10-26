@@ -24,6 +24,7 @@ IMAGE="${IMAGE:-self-healing:ci}"
 PORT="${PORT:-18090}"
 SA="system:serviceaccount:${NS}:self-healing"
 LOG_OUT="${LOG_OUT:-$ROOT/e2e-self-healing.log}"
+DIAG_OUT="${DIAG_OUT:-$ROOT/e2e-diagnostico.txt}"
 PF_PID=""
 
 dump() {
@@ -46,6 +47,24 @@ dump() {
   echo "--- logs da execução anterior (se houve crash) ---"
   kubectl -n "$NS" logs deploy/self-healing --previous --tail=200 2>&1 || true
   echo "::endgroup::"
+
+  # Resumo curto como ANOTAÇÃO do job (aparece no topo da execução, sem expandir grupos)
+  # e salvo em arquivo (vira artefato).
+  {
+    echo "== container =="
+    kubectl -n "$NS" get pods -l app.kubernetes.io/name=self-healing \
+      -o jsonpath='{range .items[*]}{.metadata.name}{" imagem="}{.spec.containers[0].image}{" ready="}{.status.containerStatuses[0].ready}{" restarts="}{.status.containerStatuses[0].restartCount}{" waiting="}{.status.containerStatuses[0].state.waiting.reason}{" | "}{.status.containerStatuses[0].state.waiting.message}{" terminated="}{.status.containerStatuses[0].lastState.terminated.reason}{" exit="}{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}{end}' 2>&1
+    echo "== eventos do pod =="
+    kubectl -n "$NS" describe pod -l app.kubernetes.io/name=self-healing 2>&1 | sed -n '/^Events:/,$p' | tail -15
+    echo "== logs do receptor =="
+    kubectl -n "$NS" logs deploy/self-healing --tail=15 2>&1
+    kubectl -n "$NS" logs deploy/self-healing --previous --tail=15 2>&1 | sed 's/^/[previous] /'
+    echo "== imagens no nó =="
+    docker exec "$(kind get clusters | head -n1)-control-plane" crictl images 2>&1 | grep -E 'self-healing|IMAGE' | head -5
+  } > "$DIAG_OUT" 2>&1 || true
+  # %0A = quebra de linha em anotações do GitHub; limita o tamanho
+  MSG="$(head -c 3500 "$DIAG_OUT" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+  echo "::error title=diagnostico self-healing::${MSG}"
 
   echo "::group::diagnóstico: imagens no nó do kind"
   docker exec "$(kind get clusters | head -n1)-control-plane" crictl images 2>/dev/null | grep -E 'self-healing|IMAGE' || echo "(não consegui listar imagens do nó)"
