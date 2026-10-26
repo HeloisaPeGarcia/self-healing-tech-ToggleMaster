@@ -8,6 +8,8 @@ on:
       - "auth-service/**"
       - "samples/**"
       - "scripts/e2e-kind.sh"
+      - "scripts/render_config.py"
+      - "scripts/test_render_config.py"
       - ".github/workflows/self-healing-test.yml"
   push:
     branches: [main]
@@ -43,6 +45,9 @@ jobs:
           test -z "$(gofmt -l .)" || { echo "gofmt pendente:"; gofmt -l .; exit 1; }
           go vet ./...
           go test -race -count=1 ./...
+
+      - name: Gerador de config (render_config.py)
+        run: python3 -I scripts/test_render_config.py
 
       # No repo principal o chaos.go já está dentro de auth-service/.
       - name: Chaos do auth-service

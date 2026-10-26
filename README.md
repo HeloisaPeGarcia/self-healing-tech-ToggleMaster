@@ -29,7 +29,9 @@ Grafana Alerting ──(alerta Firing)──► Contact points
 | `gitops/services/self-healing/` | Deployment, Service, ServiceAccount, Role/RoleBinding, ConfigMap (allowlist) |
 | `gitops/argocd/self-healing.yaml` | Application do Argo CD |
 | `integration/` | Patches para o repo principal (ECR/Terraform, workflow, deployment do auth) |
-| `scripts/` | `create-secret`, `test-webhook`, `chaos`, `traffic`, `collect-evidence` |
+| `scripts/` | `create-secret`, `test-webhook`, `chaos`, `traffic`, `collect-evidence`, `e2e-kind` |
+| `.github/workflows/self-healing-test.yml` | Action de teste: unitários, manifests/RBAC e E2E em kind |
+| `.github/workflows/self-healing-config.yml` + `scripts/render_config.py` | Preenche allowlist e RBAC a partir de inputs e abre PR |
 | `samples/` | Payloads de webhook do Grafana (firing / resolved / outro alerta) |
 | `docs/` | Arquitetura, integração, roteiro da prova real, evidências/relatório |
 
@@ -41,6 +43,7 @@ Grafana Alerting ──(alerta Firing)──► Contact points
 | Chaos no auth (modos `errors`/`unhealthy`, TTL, só em memória) | Pronto, 5 testes passando |
 | Manifests GitOps + RBAC mínimo | Pronto (YAML validado; **não aplicado em cluster**) |
 | Patches no repo principal | Aplicam limpo em `main` (`git apply --check`) |
+| Action de teste (`self-healing-test.yml`) + `scripts/e2e-kind.sh` | Escritos e validados estaticamente; **o job E2E em kind ainda não foi executado** (rode no GitHub) |
 | Build da imagem / deploy no EKS / teste com Grafana real | **Pendente — precisa do cluster** |
 | Alerta no Grafana, PagerDuty/OpsGenie, Slack | Depende da Susana (ver `docs/integracao.md`) |
 
