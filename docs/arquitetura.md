@@ -25,6 +25,15 @@
 Atenção: em `unhealthy` os pods saem do Service, então **não chega tráfego** e o 5xx
 some dos logs. Por isso `errors` é o modo recomendado para o alerta de taxa de 5xx.
 
+## Dois caminhos para o alerta de 5xx
+
+| Origem | Como a taxa é calculada | Quando usar |
+|---|---|---|
+| Logs (Loki) | `status_code >= 500` / `status_code > 0` nos logs JSON do auth | Funciona desde já; depende só do chaos e do tráfego |
+| Traces (spanmetrics do Collector) | `traces_span_metrics_calls_total{http_response_status_code=~"5.."}` | Depois que o `auth-service` (Go) for instrumentado; o `otelhttp` precisa ficar **por fora** do `chaosMiddleware` |
+
+O receptor não depende de qual origem dispara: ele só olha `alertname` e labels do webhook.
+
 ## Estado por pod
 
 O chaos é por pod. Com 2 réplicas, `scripts/chaos.sh on` liga nas duas (senão ~50% das

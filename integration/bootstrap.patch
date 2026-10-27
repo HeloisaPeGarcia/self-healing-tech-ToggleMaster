@@ -1,0 +1,20 @@
+--- a/scripts/aws/05-bootstrap-cluster.sh
++++ b/scripts/aws/05-bootstrap-cluster.sh
+@@ -366,7 +366,17 @@
+     --timeout=10m
+ done
+ 
++# Self-healing (Fase 4): o Secret com o token do webhook precisa existir ANTES do
++# pod subir (senão fica em CreateContainerConfigError). Só cria se não existir,
++# para não trocar o token que já foi colado no contact point do Grafana.
++if ! kubectl -n togglemaster get secret togglemaster-self-healing >/dev/null 2>&1; then
++  kubectl -n togglemaster create secret generic togglemaster-self-healing \
++    --from-literal=WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" >/dev/null
++  echo "Secret togglemaster-self-healing criado (token não exibido)."
++fi
++
+ kubectl apply -f gitops/argocd/applications.yaml
++kubectl apply -f gitops/argocd/self-healing.yaml
+ 
+ echo
+ echo "Preparando namespace e credenciais do monitoramento..."

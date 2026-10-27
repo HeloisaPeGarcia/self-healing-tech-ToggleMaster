@@ -28,12 +28,12 @@ Grafana Alerting ──(alerta Firing)──► Contact points
 | `auth-service-chaos/` | `chaos.go` + testes + `main.go.patch` para o auth-service |
 | `gitops/services/self-healing/` | Deployment, Service, ServiceAccount, Role/RoleBinding, ConfigMap (allowlist) |
 | `gitops/argocd/self-healing.yaml` | Application do Argo CD |
-| `integration/` | Patches para o repo principal (ECR/Terraform, workflow, deployment do auth) |
+| `integration/` | Patches para o repo principal (ECR/Terraform, workflow, deployment do auth, **bootstrap**) |
 | `scripts/` | `create-secret`, `test-webhook`, `chaos`, `traffic`, `collect-evidence`, `e2e-kind` |
 | `.github/workflows/self-healing-test.yml` | Action de teste: unitários, manifests/RBAC e E2E em kind |
 | `.github/workflows/self-healing-config.yml` + `scripts/render_config.py` | Preenche allowlist e RBAC a partir de inputs e abre PR |
 | `samples/` | Payloads de webhook do Grafana (firing / resolved / outro alerta) |
-| `docs/` | Arquitetura, integração, roteiro da prova real, evidências/relatório |
+| `docs/` | Arquitetura, integração, roteiro da prova real, evidências/relatório, **alinhamento-time** (mensagens prontas) |
 
 ## Status
 
